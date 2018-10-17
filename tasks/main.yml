@@ -1,7 +1,10 @@
 ---
 # Variable setup.
 - name: Include OS-specific variables.
-  include_vars: "{{ ansible_os_family }}.yml"
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution }}.yml"
+    - "{{ ansible_os_family }}.yml"
 
 - name: Define redis_package.
   set_fact:
@@ -18,11 +21,24 @@
 - include: setup-Archlinux.yml
   when: ansible_os_family == 'Archlinux'
 
-- name: Ensure Redis is configured.
-  template:
-    src: redis.conf.j2
-    dest: "{{ redis_conf_path }}"
-    mode: 0644
+- include: setup-SmartOS.yml
+  when: ansible_distribution == 'SmartOS'
+
+#- name: Ensure Redis is configured.
+#  template:
+#    src: redis.conf.j2
+#    dest: "{{ redis_conf_path }}"
+#    mode: 0644
+#  notify: restart redis
+
+- name: Update the Redis configuration file
+  ini_file: >
+    dest={{ redis_conf_path }}
+    option="{{ item }}"
+    section=''
+    allow_no_value=yes
+  with_items: "{{ redis_config }}"
+  when: not((redis_config is undefined) or (redis_config is none) or (redis_config|trim == '') or (item is none))
   notify: restart redis
 
 - name: Ensure Redis is running and enabled on boot.
